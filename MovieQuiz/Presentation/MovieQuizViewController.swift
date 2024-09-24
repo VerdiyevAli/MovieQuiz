@@ -1,171 +1,200 @@
 import UIKit
 
-final class MovieQuizViewController: UIViewController {
-    private struct QuizQuestion {
-        let image: String
-        let text: String
-        let correctAnswer: Bool
+// Переименуем AlertModel, чтобы избежать конфликтов
+struct QuizAlertModel {
+    let title: String
+    let message: String
+    let buttonText: String
+    let completion: (() -> Void)?
+}
+
+// Переименуем AlertPresenter
+final class QuizAlertPresenter {
+    private weak var viewController: UIViewController?
+
+    // Inject view controller into AlertPresenter
+    init(viewController: UIViewController) {
+        self.viewController = viewController
     }
-    
-    private let questions: [QuizQuestion] = [
-        QuizQuestion(
-            image: "The Godfather",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "The Dark Knight",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "Kill Bill",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "The Avengers",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "Deadpool",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "The Green Knight",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: true),
-        QuizQuestion(
-            image: "Old",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false),
-        QuizQuestion(
-            image: "The Ice Age Adventures of Buck Wild",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false),
-        QuizQuestion(
-            image: "Tesla",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false),
-        QuizQuestion(
-            image: "Vivarium",
-            text: "Рейтинг этого фильма больше чем 6?",
-            correctAnswer: false)
-    ]
-    
+
+    // Method to show the alert
+    func showAlert(model: QuizAlertModel) {
+        let alertController = UIAlertController(
+            title: model.title,
+            message: model.message,
+            preferredStyle: .alert
+        )
+
+        let action = UIAlertAction(title: model.buttonText, style: .default) { _ in
+            model.completion?()
+        }
+
+        alertController.addAction(action)
+
+        viewController?.present(alertController, animated: true, completion: nil)
+    }
+}
+
+final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     private var currentQuestionIndex = 0
     private var correctAnswers = 0
     private var isAlertPresented = false
+    private var questionFactory: QuestionFactoryProtocol = QuestionFactory()
+    private var alertPresenter: QuizAlertPresenter?
+    private var statisticService: StatisticServiceProtocol = StatisticService()
     
-    private struct QuizStepViewModel {
-        let image: UIImage
-        let question: String
-        let questionNumber: String
+    private let questionsAmount: Int = 10
+    private var currentQuestion: QuizQuestion?
+
+    // MARK: - Lifecycle
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        let questionFactory = QuestionFactory()
+        questionFactory.setup(delegate: self)
+        self.questionFactory = questionFactory
+        imageView.layer.cornerRadius = 20
+        
+        alertPresenter = QuizAlertPresenter(viewController: self)
+        
+        questionFactory.requestNextQuestion()
+        showCurrent()
     }
+
+    // MARK: - Private Methods
     
     private func convert(model: QuizQuestion) -> QuizStepViewModel {
         return QuizStepViewModel(
             image: UIImage(named: model.image) ?? UIImage(),
             question: model.text,
-            questionNumber: "\(currentQuestionIndex + 1)/\(questions.count)"
+            questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)"
         )
     }
-    
+
     private func show(quiz step: QuizStepViewModel) {
         imageView.image = step.image
         textLabel.text = step.question
         counterLabel.text = step.questionNumber
     }
-    
-    private func showCurrent() {
-        let currentQuestion = questions[currentQuestionIndex]
-        let currentView = convert(model: currentQuestion)
-        show(quiz: currentView)
-    }
-    
-    private func showNextQuestionOrResult() {
-        imageView.layer.borderWidth = 0
-        imageView.layer.borderColor = UIColor.clear.cgColor
 
-        if currentQuestionIndex == questions.count - 1 {
-            showResults()
+    private func showCurrent() {
+        questionFactory.requestNextQuestion()
+    }
+
+    private func showNextQuestionOrResults() {
+        if currentQuestionIndex == questionsAmount - 1 {
+            // Сохраняем результаты
+            statisticService.store(correct: correctAnswers, total: questionsAmount)
+
+            // Показываем результаты квиза
+            showQuizResults()
         } else {
             currentQuestionIndex += 1
+            resetBorders() // Сбрасываем обводку перед следующим вопросом
+            changeStatusButton(isEnabled: true) // Включаем кнопки
             showCurrent()
-            changeStatusButton(isEnabled: true) // Активируем кнопки снова
         }
     }
-    private func showResults() {
-        if isAlertPresented { return }
-        
-        isAlertPresented = true
-        
-        let alert = UIAlertController(
-            title: "Раунд окончен!",
-            message: String(),
-            preferredStyle: .alert
-        )
-        
-        let action = UIAlertAction(title: "Сыграть ещё раз", style: .default) { [weak self] _ in
-            guard let self = self else { return }
-            self.isAlertPresented = false
-            self.resetGame()
-        }
-        alert.addAction(action)
-        present(alert, animated: true, completion: nil)
-    }
-    
+
     private func showAnswerResult(isCorrect: Bool) {
         if isCorrect {
             correctAnswers += 1
         }
-        
+
         imageView.layer.masksToBounds = true
         imageView.layer.borderWidth = 8
         imageView.layer.borderColor = isCorrect ? UIColor.ypGreen.cgColor : UIColor.ypRed.cgColor
-        changeStatusButton(isEnabled: false) // Деактивируем кнопки сразу
+        changeStatusButton(isEnabled: false) // Выключаем кнопки
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.showNextQuestionOrResult()
+            self.showNextQuestionOrResults()
         }
     }
-    
+
+    private func resetBorders() {
+        // Сброс границ изображения
+        imageView.layer.borderWidth = 0
+    }
+
     private func changeStatusButton(isEnabled: Bool) {
         noButton.isEnabled = isEnabled
         yesButton.isEnabled = isEnabled
     }
-    
+
     private func resetGame() {
         currentQuestionIndex = 0
         correctAnswers = 0
         showCurrent()
         changeStatusButton(isEnabled: true)
-        
     }
-    
-    
-    
-    @IBOutlet private var yesButton: UIButton!
-    @IBOutlet private var noButton: UIButton!
-    @IBOutlet weak var questionLablel: UILabel!
-    @IBOutlet private var counterLabel: UILabel!
-    @IBOutlet private var textLabel: UILabel!
-    @IBOutlet private var imageView: UIImageView!
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        showCurrent()
-        imageView.layer.cornerRadius = 20
-        
+
+    private func showQuizResults() {
+        let bestGame = statisticService.bestGame
+        let gamesPlayed = statisticService.gamesCount
+        let accuracy = statisticService.totalAccuracy
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd.MM.yy HH:mm"
+        let formattedDate = dateFormatter.string(from: bestGame.date)
+
+        let message = """
+        Количество сыгранных квизов: \(gamesPlayed)
+        Ваши правильные ответы: \(correctAnswers) из \(questionsAmount)
+        Рекорд: \(bestGame.correct)/\(bestGame.total) (\(formattedDate))
+        Средняя точность: \(String(format: "%.2f", accuracy))%
+        """
+
+        let alertModel = QuizAlertModel(
+            title: "Результаты квиза",
+            message: message,
+            buttonText: "ОК"
+        ) { [weak self] in
+            self?.resetGame()
+        }
+
+        alertPresenter?.showAlert(model: alertModel)
     }
+    // MARK: - QuestionFactoryDelegate
+
+    func didReceiveNextQuestion(question: QuizQuestion?) {
+        guard let question = question else {
+            return
+        }
+
+        currentQuestion = question
+        let viewModel = convert(model: question)
+
+        DispatchQueue.main.async { [weak self] in
+            self?.show(quiz: viewModel)
+        }
+    }
+
+
+    // MARK: - Actions
     
     @IBAction private func noButtonClicked(_ sender: UIButton) {
-        let currentQuestion = questions[currentQuestionIndex]
+        guard let currentQuestion = currentQuestion else {
+            return
+        }
         let givenAnswer = false
         showAnswerResult(isCorrect: givenAnswer == currentQuestion.correctAnswer)
     }
     
     @IBAction private func yesButtonClicked(_ sender: UIButton) {
-        let currentQuestion = questions[currentQuestionIndex]
+        guard let currentQuestion = currentQuestion else {
+            return
+        }
         let givenAnswer = true
         showAnswerResult(isCorrect: givenAnswer == currentQuestion.correctAnswer)
     }
+    
+    // MARK: - IBOutlets
+    
+    @IBOutlet private var yesButton: UIButton!
+    @IBOutlet private var noButton: UIButton!
+    @IBOutlet private weak var questionLabel: UILabel!
+    @IBOutlet private var counterLabel: UILabel!
+    @IBOutlet private var textLabel: UILabel!
+    @IBOutlet private var imageView: UIImageView!
 }
-

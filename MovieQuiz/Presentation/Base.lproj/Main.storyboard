@@ -119,7 +119,7 @@
                         <outlet property="counterLabel" destination="FdP-cY-q0Z" id="HIO-uN-Yz0"/>
                         <outlet property="imageView" destination="DvL-uR-AcD" id="tHG-hp-2kg"/>
                         <outlet property="noButton" destination="Abk-E2-xgX" id="lwK-yp-IrJ"/>
-                        <outlet property="questionLablel" destination="dVf-Q8-xaQ" id="ukr-eE-Uqj"/>
+                        <outlet property="questionLabel" destination="dVf-Q8-xaQ" id="tWj-bR-GWX"/>
                         <outlet property="textLabel" destination="5pm-Pk-f6g" id="okt-Oc-2vG"/>
                         <outlet property="yesButton" destination="7Vz-JW-BWh" id="W3e-Os-Xw5"/>
                     </connections>
