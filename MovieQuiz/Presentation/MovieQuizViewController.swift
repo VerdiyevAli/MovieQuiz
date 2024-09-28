@@ -39,7 +39,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     private var currentQuestionIndex = 0
     private var correctAnswers = 0
     private var isAlertPresented = false
-    private var questionFactory: QuestionFactoryProtocol = QuestionFactory()
+    private var questionFactory: QuestionFactoryProtocol? // = QuestionFactory()
     private var alertPresenter: QuizAlertPresenter?
     private var statisticService: StatisticServiceProtocol = StatisticService()
     
@@ -50,26 +50,35 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        let questionFactory = QuestionFactory()
+        let questionFactory = QuestionFactory(moviesLoader: MoviesLoader(), delegate: self)
         questionFactory.setup(delegate: self)
-        self.questionFactory = questionFactory
         imageView.layer.cornerRadius = 20
         
         alertPresenter = QuizAlertPresenter(viewController: self)
-        
-        questionFactory.requestNextQuestion()
+        questionFactory.loadData()
         showCurrent()
+        self.questionFactory = questionFactory
     }
 
     // MARK: - Private Methods
-    
+    func didLoadDataFromServer() {
+        questionFactory?.requestNextQuestion()
+    }
+
+    func didFailToLoadData(with error: Error) {}
+
+    private func showNetworkError(message: String) {
+        let alert = UIAlertController(title: "Ошибка сети", message: message, preferredStyle: .alert)
+        let action = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
+    }
+
     private func convert(model: QuizQuestion) -> QuizStepViewModel {
         return QuizStepViewModel(
-            image: UIImage(named: model.image) ?? UIImage(),
+            image: UIImage(data: model.image) ?? UIImage(),
             question: model.text,
-            questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)"
-        )
+            questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)")
     }
 
     private func show(quiz step: QuizStepViewModel) {
@@ -79,8 +88,13 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     }
 
     private func showCurrent() {
-        questionFactory.requestNextQuestion()
+        guard let factory = questionFactory else {
+            // Обработка случая с nil (например, показать ошибку или состояние загрузки)
+            return
+        }
+        factory.requestNextQuestion()
     }
+
 
     private func showNextQuestionOrResults() {
         if currentQuestionIndex == questionsAmount - 1 {
@@ -126,6 +140,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         currentQuestionIndex = 0
         correctAnswers = 0
         showCurrent()
+        resetBorders()
         changeStatusButton(isEnabled: true)
     }
 
@@ -155,6 +170,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
 
         alertPresenter?.showAlert(model: alertModel)
     }
+
     // MARK: - QuestionFactoryDelegate
 
     func didReceiveNextQuestion(question: QuizQuestion?) {
@@ -190,7 +206,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     }
     
     // MARK: - IBOutlets
-    
+    @IBOutlet private weak var activityIndicator: UIActivityIndicatorView!
     @IBOutlet private var yesButton: UIButton!
     @IBOutlet private var noButton: UIButton!
     @IBOutlet private weak var questionLabel: UILabel!

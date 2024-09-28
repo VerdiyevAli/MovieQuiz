@@ -1,14 +1,4 @@
-//
-//  QuizAlertModel.swift
-//  MovieQuiz
-//
-//  Created by Ali Verdiyev on 27.08.24.
-//
-
-import Foundation
-
-
-
+import UIKit
 
 struct AlertModel {
     let title: String
