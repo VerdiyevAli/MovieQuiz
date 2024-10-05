@@ -45,7 +45,16 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     
     private let questionsAmount: Int = 10
     private var currentQuestion: QuizQuestion?
-
+    func showLoadingIndicator() {
+       activityIndicator.isHidden = false // говорим, что индикатор загрузки не скрыт
+       activityIndicator.startAnimating() // включаем анимацию
+   }
+    func hideLoadingIndicator() {
+           activityIndicator.stopAnimating() // останавливаем анимацию
+           activityIndicator.isHidden = true // скрываем индикатор
+       }
+    
+    
     // MARK: - Lifecycle
     
     override func viewDidLoad() {
@@ -53,6 +62,8 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         let questionFactory = QuestionFactory(moviesLoader: MoviesLoader(), delegate: self)
         questionFactory.setup(delegate: self)
         imageView.layer.cornerRadius = 20
+        showLoadingIndicator()
+        
         
         alertPresenter = QuizAlertPresenter(viewController: self)
         questionFactory.loadData()
@@ -61,6 +72,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     }
 
     // MARK: - Private Methods
+    
     func didLoadDataFromServer() {
         questionFactory?.requestNextQuestion()
     }
@@ -79,6 +91,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
             image: UIImage(data: model.image) ?? UIImage(),
             question: model.text,
             questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)")
+
     }
 
     private func show(quiz step: QuizStepViewModel) {
@@ -171,10 +184,13 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         alertPresenter?.showAlert(model: alertModel)
     }
 
+
     // MARK: - QuestionFactoryDelegate
 
     func didReceiveNextQuestion(question: QuizQuestion?) {
         guard let question = question else {
+            // Если вопрос не получен, скрываем индикатор загрузки
+            hideLoadingIndicator()
             return
         }
 
@@ -182,6 +198,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         let viewModel = convert(model: question)
 
         DispatchQueue.main.async { [weak self] in
+            self?.hideLoadingIndicator() // Скрываем индикатор загрузки, когда вопрос загружен
             self?.show(quiz: viewModel)
         }
     }
@@ -214,3 +231,4 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     @IBOutlet private var textLabel: UILabel!
     @IBOutlet private var imageView: UIImageView!
 }
+
