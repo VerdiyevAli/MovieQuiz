@@ -119,7 +119,7 @@ class QuestionFactory: QuestionFactoryProtocol {
             let question = QuizQuestion(image: imageData, text: text, correctAnswer: correctAnswer)
             
             DispatchQueue.main.async { [weak self] in
-                self?.delegate?.didReceiveNextQuestion(question: question)
+                self?.delegate?.didRecieveNextQuestion(question: question)
             }
         }
     }

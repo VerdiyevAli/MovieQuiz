@@ -1,7 +1,7 @@
 import UIKit
 
 struct QuizResultsViewModel {
-    let image: String
-    let text: String
-    let correctAnswer: Bool
+ let title: String
+ let text: String
+ let buttonText: String
 }
